@@ -33,55 +33,61 @@ func New(name, path string, maxLines, flag int) (LogFile, error) {
 		maxLines = math.MaxUint16
 	}
 	l := LogFile{name: name, path: path, lines: 0, maxLines: uint16(maxLines), flag: flag}
-	err := l.new()
+	err := l.new(1)
 	return l, err
 }
 
 // logs message like log.Println()
 func (l *LogFile) Log(messages ...interface{}) {
-	l.update()
 	s := fmt.Sprintln(messages...)
+	l.update(countLineEnds(s))
 	l.logger.Print(s)
 }
 
 // logs error like log.Println() with debug info about caller and caller's caller
 func (l *LogFile) Error(messages ...interface{}) {
-	l.update()
 	s := "error:\n"
+	s += debugInfo()
 	s += fmt.Sprintln(messages...)
-	l.logger.Print(debugInfo() + s)
+	l.update(countLineEnds(s))
+	l.logger.Print(s)
 }
 
 // initiates and logs panic like log.Panic() with debug info about caller and caller's caller
 func (l *LogFile) Panic(messages ...interface{}) {
-	l.update()
-	s := "PANIC:\n         "
+	s := "PANIC:\n"
+	s += debugInfo()
 	s += fmt.Sprintln(messages...)
-	l.logger.Panic(debugInfo() + s)
+	l.update(countLineEnds(s))
+	l.logger.Panic(s)
 }
 
 // calls and logs os.Exit like log.Fatal() with debug info about caller and caller's caller
 func (l *LogFile) Fatal(messages ...interface{}) {
-	l.update()
-	s := "FATAL:\n         "
+	s := "FATAL:\n"
 	s += fmt.Sprintln(messages...)
-	l.logger.Fatal(debugInfo() + s)
+	s = debugInfo() + s
+	l.update(countLineEnds(s))
+	l.logger.Fatal(s)
 }
 
 // keeps logFile struct up to date
-func (l *LogFile) update() {
-	l.lines++
-	if fileExists(l.currentFile) && l.lines < l.maxLines-1 {
+func (l *LogFile) update(n int) {
+	if n < 0 {
+		n = -n
+	}
+	l.lines += uint16(n)
+	if fileExists(l.currentFile) && l.lines < l.maxLines {
 		return
 	}
-	err := l.new()
+	err := l.new(n)
 	if err != nil {
 		panic(err)
 	}
 }
 
 // scans target folder and either uses valid log file or creates new log file
-func (l *LogFile) new() error {
+func (l *LogFile) new(n int) error {
 	fis, err := ioutil.ReadDir(l.path)
 	if err != nil {
 		return err
@@ -96,7 +102,7 @@ func (l *LogFile) new() error {
 				continue
 			}
 			lines, err := lineCounter(f)
-			if lines < int(l.maxLines) {
+			if lines+n < int(l.maxLines) {
 				l.lines = uint16(lines)
 				l.currentFile = filepath.Join(l.path, fi.Name())
 				f, err := os.OpenFile(l.currentFile, os.O_APPEND|os.O_WRONLY, 0644)
@@ -116,6 +122,7 @@ func (l *LogFile) new() error {
 	}
 	l.logger = log.New(f, "", l.flag)
 	l.Log("file started", time.Now().String())
+	l.update(1 + n)
 	return err
 }
 
@@ -125,19 +132,22 @@ func lineCounter(r io.Reader) (int, error) {
 	buf := make([]byte, 32*1024)
 	count := 0
 	lineSep := []byte{'\n'}
-
 	for {
 		c, err := r.Read(buf)
 		count += bytes.Count(buf[:c], lineSep)
-
 		switch {
 		case err == io.EOF:
 			return count, nil
-
 		case err != nil:
 			return count, err
 		}
 	}
+}
+func countLineEnds(s string) int {
+	count := 0
+	lineSep := []byte{'\n'}
+	count += bytes.Count([]byte(s), lineSep)
+	return count
 }
 
 // fileExists checks if a file exists and is not a directory
@@ -154,7 +164,6 @@ func debugInfo() string {
 	var info string
 	caller := getFrame(2)
 	callersCaller := getFrame(3)
-	info += fmt.Sprintln("")
 	info += fmt.Sprintln("current:", cutSrcPath(caller.Function), cutSrcPath(caller.File), caller.Line)
 	info += fmt.Sprintln("caller:", cutSrcPath(callersCaller.Function), cutSrcPath(callersCaller.File), callersCaller.Line)
 	return info
