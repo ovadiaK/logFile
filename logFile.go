@@ -36,29 +36,39 @@ func New(name, path string, maxLines, flag int) (LogFile, error) {
 	err := l.new()
 	return l, err
 }
+
+// logs message like log.Println()
 func (l *LogFile) Log(messages ...interface{}) {
 	l.update()
 	s := fmt.Sprintln(messages...)
 	l.logger.Print(s)
 }
+
+// logs error like log.Println() with debug info about caller and caller's caller
 func (l *LogFile) Error(messages ...interface{}) {
 	l.update()
-	s := "error:"
+	s := "error:\n"
 	s += fmt.Sprintln(messages...)
 	l.logger.Print(debugInfo() + s)
 }
+
+// initiates and logs panic like log.Panic() with debug info about caller and caller's caller
 func (l *LogFile) Panic(messages ...interface{}) {
 	l.update()
 	s := "PANIC:\n         "
 	s += fmt.Sprintln(messages...)
 	l.logger.Panic(debugInfo() + s)
 }
+
+// calls and logs os.Exit like log.Fatal() with debug info about caller and caller's caller
 func (l *LogFile) Fatal(messages ...interface{}) {
 	l.update()
 	s := "FATAL:\n         "
 	s += fmt.Sprintln(messages...)
 	l.logger.Fatal(debugInfo() + s)
 }
+
+// keeps logFile struct up to date
 func (l *LogFile) update() {
 	l.lines++
 	if fileExists(l.currentFile) && l.lines < l.maxLines-1 {
@@ -70,6 +80,7 @@ func (l *LogFile) update() {
 	}
 }
 
+// scans target folder and either uses valid log file or creates new log file
 func (l *LogFile) new() error {
 	fis, err := ioutil.ReadDir(l.path)
 	if err != nil {
@@ -108,6 +119,7 @@ func (l *LogFile) new() error {
 	return err
 }
 
+// counts lines of file, taken from:
 // https://stackoverflow.com/questions/24562942/golang-how-do-i-determine-the-number-of-lines-in-a-file-efficiently
 func lineCounter(r io.Reader) (int, error) {
 	buf := make([]byte, 32*1024)
@@ -128,8 +140,7 @@ func lineCounter(r io.Reader) (int, error) {
 	}
 }
 
-// fileExists checks if a file exists and is not a directory before we
-// try using it to prevent further errors.
+// fileExists checks if a file exists and is not a directory
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
 	if os.IsNotExist(err) {
@@ -137,6 +148,8 @@ func fileExists(filename string) bool {
 	}
 	return !info.IsDir()
 }
+
+// adds caller and caller's caller info to sting
 func debugInfo() string {
 	var info string
 	caller := getFrame(2)
@@ -146,6 +159,8 @@ func debugInfo() string {
 	info += fmt.Sprintln("caller:", cutSrcPath(callersCaller.Function), cutSrcPath(callersCaller.File), callersCaller.Line)
 	return info
 }
+
+// cuts all path before "src" like in ~/go/src/...
 func cutSrcPath(s string) string {
 	cutset := string(filepath.Separator) + "src" + string(filepath.Separator) //src as is common in go
 	if strings.Contains(s, cutset) {
@@ -155,6 +170,7 @@ func cutSrcPath(s string) string {
 	return s
 }
 
+// get frames of callers
 func getFrame(skipFrames int) runtime.Frame {
 	// We need the frame at index skipFrames+2, since we never want runtime.Callers and getFrame
 	targetFrameIndex := skipFrames + 2
