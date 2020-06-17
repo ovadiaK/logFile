@@ -52,43 +52,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-// check debug info
-func TestLogFile_Error(t *testing.T) {
-	l := buildUp(2000)
-	func1 := func() {
-		l.Error("func1")
-		return
-	}
-	func2 := func() {
-		l.Error("func2")
-		func1()
-		return
-	}
-	func2()
-	fis, err := ioutil.ReadDir(l.path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, fi := range fis {
-		if strings.Contains(fi.Name(), l.name) {
-			if fi.IsDir() {
-				continue
-			}
-			f, err := os.Open(filepath.Join(l.path, fi.Name()))
-			if err != nil {
-				continue
-			}
-			var s string
-			if _, err := f.Read([]byte(s)); err != nil {
-				t.Fatal(err)
-			}
-
-		}
-	}
-	//t.Fatal("end")
-	//tearDown()
-}
-
 func buildUp(numLines int) LogFile {
 	if err := os.Mkdir(testFolder, os.ModePerm); err != nil {
 		//t.Fatal(err)
