@@ -58,6 +58,7 @@ func (l *LogFile) Panic(messages ...interface{}) {
 	s := "PANIC:\n"
 	s += debugInfo()
 	s += fmt.Sprintln(messages...)
+	fmt.Println(s)
 	l.update(countLineEnds(s))
 	l.logger.Panic(s)
 }
@@ -67,6 +68,7 @@ func (l *LogFile) Fatal(messages ...interface{}) {
 	s := "FATAL:\n"
 	s += fmt.Sprintln(messages...)
 	s = debugInfo() + s
+	fmt.Println(s)
 	l.update(countLineEnds(s))
 	l.logger.Fatal(s)
 }
